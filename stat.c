@@ -6,8 +6,9 @@
 
 #include "utils_v10.h"
 
-#define SHMKEY 123
-#define SEMKEY 456
+#define SHMKEY_PROGRAMMES 123
+#define SHMKEY_INDEX 456
+#define SEMKEY 789
 
 typedef struct PROGRAM {
     char name[255];
@@ -22,14 +23,17 @@ int main(int argc, char const *argv[]) {
         return 0;
     }
     
-    int sem_id, shm_id;
+    int sem_id, shm_id_prog, shm_id_index;
     
     sem_id = sem_get(SEMKEY, 1);
-    shm_id = sshmget(SHMKEY, sizeof(program[1000]), 0);
+    shm_id_prog = sshmget(SHMKEY_PROGRAMMES, sizeof(program[1000]), 0);
+    shm_id_index = sshmget(SHMKEY_INDEX, sizeof(int), 0);
 
     program* programs;
+    int* programsIndex;
 
-    programs = sshmat(shm_id);
+    programs = sshmat(shm_id_prog);
+    programsIndex = sshmat(shm_id_index);
 
     
     int id = atoi(argv[1])-1;
