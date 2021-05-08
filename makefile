@@ -24,10 +24,6 @@ stat.o : stat.c utils_v10.h
 utils_v10.o: utils_v10.c utils_v10.h
 	$(CC) $(CCFLAGS) -c utils_v10.c 
 
-
-clear :
-		clear
-
 clean :
 	rm -f *.o
 	rm -f server
