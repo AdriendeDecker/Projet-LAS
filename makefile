@@ -26,5 +26,4 @@ utils_v10.o: utils_v10.c utils_v10.h
 
 clean :
 	rm -f *.o
-	rm -f server
-	rm -f maint
+	rm -f server maint stat
