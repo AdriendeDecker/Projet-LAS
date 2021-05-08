@@ -6,8 +6,9 @@
 
 #include "utils_v10.h"
 
-#define SHMKEY 123
-#define SEMKEY 456
+#define SHMKEY_PROGRAMMES 123
+#define SHMKEY_INDEX 456
+#define SEMKEY 789
 #define  PERM 0666
 
 struct program {
@@ -18,7 +19,7 @@ struct program {
 };
 
 int main(int argc, char const **argv){
-    int sem_id, shm_id;
+    int sem_id, shm_id_prog, shm_id_index;
 
     if(argc <2){
         printf("Il manque des arguments ! \n");
@@ -32,8 +33,11 @@ int main(int argc, char const **argv){
         //Create semaphore
         sem_id = sem_create(SEMKEY, 1, PERM, 1);
         
-        //Create Shared Mermory
-        shm_id = sshmget(SHMKEY, sizeof(struct program[1000]), IPC_CREAT | PERM);
+        //Create Shared Mermory for programmes
+        shm_id_prog = sshmget(SHMKEY_PROGRAMMES, sizeof(struct program[1000]), IPC_CREAT | PERM);
+
+        //Create Shared Memory for index 
+        shm_id_index = sshmget(SHMKEY_INDEX, sizeof(int), IPC_CREAT | PERM);
         
         printf("La création du répertoire de fichier partagé s'est effectué avec succès ! \n");
     } 
@@ -41,8 +45,10 @@ int main(int argc, char const **argv){
         printf("action 2 : destruction des ressources partagées\n");
 
         sem_id = sem_create(SEMKEY, 1, PERM, 1);
-        shm_id = sshmget(SHMKEY, sizeof(struct program[1000]), IPC_CREAT | PERM);
-        sshmdelete(shm_id);
+        shm_id_prog = sshmget(SHMKEY_PROGRAMMES, sizeof(struct program[1000]), 0);
+        shm_id_index = sshmget(SHMKEY_INDEX, sizeof(int), 0);
+        sshmdelete(shm_id_prog);
+        sshmdelete(shm_id_index);
         sem_delete(sem_id);
         printf("La suppression du répertoire de fichier partagé s'est effectué avec succès ! \n");
     }
@@ -55,12 +61,15 @@ int main(int argc, char const **argv){
         
         // get attached memory id
         sem_id = sem_create(SEMKEY, 1, PERM, 1);
-        shm_id = sshmget(SHMKEY, sizeof(struct program[1000]) + sizeof(int) , IPC_CREAT | PERM);
+        shm_id_prog = sshmget(SHMKEY_PROGRAMMES, sizeof(struct program[1000]), IPC_CREAT | PERM);
+        shm_id_index = sshmget(SHMKEY_INDEX, sizeof(int), IPC_CREAT | PERM);
 
         // take access to shared memory
         sem_down0(sem_id);
+        
         // wait for delai of blocking
         sleep(atoi(argv[2]));
+
         // free the access to the shared memory
         sem_up0(sem_id);
     }
