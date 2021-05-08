@@ -17,33 +17,40 @@ struct program {
     int durationMS;
 };
 
-
-
-
 int main(int argc, char const **argv){
     int sem_id, shm_id;
 
+    if(argc <2){
+        printf("Il manque des arguments ! \n");
+        return 0;
+    }
+
     // Sélection du bon type d'action a effectuer
-    if(argv[1][0] == "1") {
+    if(strcmp(argv[1], "1") == 0) {
         printf("action 1 : création des ressources partagées\n");
 
         //Create semaphore
         sem_id = sem_create(SEMKEY, 1, PERM, 1);
-                
+        
         //Create Shared Mermory
         shm_id = sshmget(SHMKEY, sizeof(struct program[1000]), IPC_CREAT | PERM);
-
-        printf("La création du répertoire de fichier partagé s'est effectué avec succès");
+        
+        printf("La création du répertoire de fichier partagé s'est effectué avec succès ! \n");
     } 
-    else if(argv[1][0] == 2) {
+    else if(strcmp(argv[1], "2") == 0) {
         printf("action 2 : destruction des ressources partagées\n");
+
         sem_id = sem_create(SEMKEY, 1, PERM, 1);
         shm_id = sshmget(SHMKEY, sizeof(struct program[1000]), IPC_CREAT | PERM);
         sshmdelete(shm_id);
         sem_delete(sem_id);
-        printf("La suppression du répertoire de fichier partagé s'est effectué avec succès");
+        printf("La suppression du répertoire de fichier partagé s'est effectué avec succès ! \n");
     }
-    else if(argv[1][0] == 3){
+    else if(strcmp(argv[1], "3") == 0){
+        if(argc < 3){
+            printf("action 3 : il manque un paramètre ! \n");
+            return 0;
+        }
         printf("action 3 : réservation exclusive des ressources partagées\n");
         
         // get attached memory id
