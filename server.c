@@ -17,7 +17,7 @@
 
 #define BACKLOG 50
 //#define SERVER_PORT 900
-//#define BUFFER 255
+#define BUFFER 255
 
 
 // PRE:  ServerPort: a valid port number
@@ -33,14 +33,35 @@
 	slisten(sockfd, BACKLOG);
 
 	int option = 1;
-	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(int));
+	// setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(int));
 
 	return sockfd;
 } */
 
+int idx = -1;
+int size = -1;
+char buffer[BUFFER];
+
+void readBlock(){
+	size = sread(0,buffer,BUFFER);	
+}
+
+
+void addOrChange (int nbrCar,char* nomFichier, char* contenu){
+
+	int fd;
+
+	fd = sopen(nomFichier, O_WRONLY | O_TRUNC | O_CREAT, 0644);
+
+	swrite(fd,contenu,nbrCar);
+	
+
+}
+
 int main(int argc, char *argv[])
 {
-	addOrChange(255,argv[1],argv[2]);
+	readBlock();
+	addOrChange(size,argv[1],buffer);
 	/* 
 	int sockfd;
 
@@ -53,15 +74,3 @@ int main(int argc, char *argv[])
 }
 
 
-void addOrChange (int nbrCar,char* nomFichier, char* contenu){
-
-	//char bufRd[BUFFER+1];
-
-	int fd;
-
-	fd = sopen(nomFichier, O_WRONLY | O_TRUNC | O_CREAT, 0644);
-
-	swrite(fd,contenu,sizeof(nbrCar));
-	
-
-}
