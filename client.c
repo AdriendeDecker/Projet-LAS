@@ -14,7 +14,7 @@ void execute1(char* adr, int port, int num);
 
 
 void minuteurProcess(void *arg1, void *arg2) {
-    int *delay = (int)arg1;
+    int *delay = arg1;
     int *pipefd = arg2;
     int battement = -1;
 
@@ -23,7 +23,7 @@ void minuteurProcess(void *arg1, void *arg2) {
 
     //condition à trouver (via un quit ou autre par exemple)
     while(1) {
-        sleep(delay);
+        sleep(*delay);
         swrite(pipefd[1],&battement, sizeof(int));
     }
 
@@ -31,7 +31,7 @@ void minuteurProcess(void *arg1, void *arg2) {
 }
 
 void execProcess(void *arg1, void *arg2, void *arg3) {
-    int port = (int)arg1;
+    int *port = arg1;
     char *adr = arg2;
     int *pipefd = arg3;
     int nbrProgrammes = 0;
@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
 
     int port = atoi(argv[2]);
     int delay = atoi(argv[3]);
-    char* adr = atoi(argv[1]);
+    char* adr = argv[1];
 
     spipe(pipefd);
     int childExec = fork_and_run3(execProcess, &port, &adr, pipefd);
