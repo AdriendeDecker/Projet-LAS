@@ -13,8 +13,8 @@
 #include <fcntl.h>
 #include <ctype.h>
 
-
 #include "utils_v10.h"
+#include "serverMessage.h"
 
 #define BACKLOG 50
 #define SERVER_PORT 2500
@@ -32,7 +32,7 @@ typedef struct PROGRAM {
     char name[255];
     bool compiled;
     int executedCount;
-    int durationMS;
+    float durationMS;
 } program;
 
 
@@ -123,37 +123,64 @@ static void option(void *arg){
 		case -1:
 			printf("Ajout d'un programme\n");
 			char* nomFichier = strtok(NULL, limiter);
-			
+			printf("%s",nomFichier);
 			break;
 		
 		//exécuter programme existant
 		case -2:
 			printf("-2\n");
 			shm_id_prog = sshmget(SHMKEY_PROGRAMMES, sizeof(program[1000]), 0);
-        	shm_id_index = sshmget(SHMKEY_INDEX, sizeof(int), 0);
+			shm_id_index = sshmget(SHMKEY_INDEX, sizeof(int), 0);
+			sem_id = sem_get(SEMKEY,1);
 
 			program* programs;
-			int* programIndex;
-
 			programs = sshmat(shm_id_prog);
-			programIndex = sshmat(shm_id_index);
+			int *indexProg = sshmat(shm_id_index);
 
 			char* nextarg = strtok(NULL, limiter);
 			int idProg = atoi(nextarg);
+			
+			//verif prog exist
+			if(idProg>=*indexProg){
+				serverMessage servermsg;
+				servermsg.idProg = idProg;
+				servermsg.state = -2;
+				servermsg.duration = 0;
+				servermsg.exitCode = -1;
+				swrite(*socket, &servermsg, sizeof(servermsg));
+			}
+			
+			if(!programs[idProg].compiled){
+				swrite(*socket, nextarg, sizeof(nextarg));
+				char* retour = "\n -1\n 0\n -1\n";
+				swrite(*socket, retour, sizeof(retour));
+				return;
+			}
+			
 			char* path = "./";
-			strcat(&path, nextarg);
+			strcat(path, nextarg);
 
 			struct timeval start, stop;
 			gettimeofday(&start, NULL);
-			sexecl(path,NULL);
+			int exitCode = sexecl(path,NULL);
 			gettimeofday(&stop, NULL);
 
 			float duree = ((stop.tv_sec - start.tv_sec) *1000.0f) + ((stop.tv_usec - start.tv_usec) / 1000.0f);
 
 			sem_down0(sem_id);
-			programs[idProg].executedCount = programs[idProg].executedCount++;
+			programs[idProg].executedCount = (programs[idProg].executedCount)+1;
+			programs[idProg].durationMS = (programs[idProg].durationMS) + duree;
 			sem_up0(sem_id);
-			
+
+			//error during execution
+			if(exitCode == -1){
+				swrite(*socket, nextarg, sizeof(nextarg));
+				char* retour = "\n 0\n \n -1\n";
+				swrite(*socket, retour, sizeof(retour));
+				return;
+			}
+			printf("duree prog = %f", duree);
+
 			break;
 
 		//modifier programme existant
@@ -167,6 +194,7 @@ static void option(void *arg){
 int main(int argc, char *argv[])
 {
  
+	//changer pour un arg
 	int sockfd = initSocketServer(SERVER_PORT);
 	printf("server %i \n",SERVER_PORT);
 
@@ -175,13 +203,9 @@ int main(int argc, char *argv[])
 		//client trt 
 		int newsockfd = saccept(sockfd);
 
-
 		fork_and_run1(option,&newsockfd);
 	
 	}
-	
-	
-
 
 	readBlock();
 	addOrChange(size,argv[1],buffer);
