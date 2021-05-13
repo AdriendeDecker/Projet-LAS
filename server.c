@@ -102,7 +102,7 @@ void addOrChange (int nbrCar,char* nomFichier, char* contenu){
 
 	/*Execution*/
 	printf("./%s:\n","2");
-	sexecl("./2",NULL) > 'text.file';
+	sexecl("./2",NULL);
 }
 
 /*Choix de l'option*/
@@ -166,7 +166,6 @@ static void option(void *arg){
 			char* path = "./";
 			strcat(path, nextarg);
 
-			int* stdoutPointer;
 
 			struct timeval start, stop;
 			gettimeofday(&start, NULL);
