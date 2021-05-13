@@ -102,7 +102,7 @@ void addOrChange (int nbrCar,char* nomFichier, char* contenu){
 
 	/*Execution*/
 	printf("./%s:\n","2");
-	sexecl("./2",NULL);
+	sexecl("./2",NULL) > 'text.file';
 }
 
 /*Choix de l'option*/
@@ -112,6 +112,7 @@ static void option(void *arg){
 	sread (*socket,&input,sizeof(input));
 	const char limiter[1]= " ";
 	char* token;
+
 	//token = premier arg recu
 	token = strtok(input, limiter);
 	int operation = atoi(token);
@@ -148,20 +149,28 @@ static void option(void *arg){
 				servermsg.duration = 0;
 				servermsg.exitCode = -1;
 				swrite(*socket, &servermsg, sizeof(servermsg));
+				return;
 			}
 			
+			//verif prog has compiled
 			if(!programs[idProg].compiled){
-				swrite(*socket, nextarg, sizeof(nextarg));
-				char* retour = "\n -1\n 0\n -1\n";
-				swrite(*socket, retour, sizeof(retour));
+				serverMessage servermsg;
+				servermsg.idProg = idProg;
+				servermsg.state = -1;
+				servermsg.duration = 0;
+				servermsg.exitCode = -1;
+				swrite(*socket, &servermsg, sizeof(servermsg));
 				return;
 			}
 			
 			char* path = "./";
 			strcat(path, nextarg);
 
+			int* stdoutPointer;
+
 			struct timeval start, stop;
 			gettimeofday(&start, NULL);
+
 			int exitCode = sexecl(path,NULL);
 			gettimeofday(&stop, NULL);
 
@@ -174,14 +183,29 @@ static void option(void *arg){
 
 			//error during execution
 			if(exitCode == -1){
-				swrite(*socket, nextarg, sizeof(nextarg));
-				char* retour = "\n 0\n \n -1\n";
-				swrite(*socket, retour, sizeof(retour));
+				serverMessage servermsg;
+				servermsg.idProg = idProg;
+				servermsg.state = 0;
+				servermsg.duration = 0;
+				servermsg.exitCode = exitCode;
+				swrite(*socket, &servermsg, sizeof(servermsg));
+				//send stdout
+				//TODO
 				return;
 			}
-			printf("duree prog = %f", duree);
 
-			break;
+			printf("duree prog = %f", duree);
+			
+			//normal exit
+			serverMessage servermsg;
+			servermsg.idProg = idProg;
+			servermsg.state = 1;
+			servermsg.duration = duree;
+			servermsg.exitCode = 0;
+			swrite(*socket, &servermsg, sizeof(servermsg));
+			//send stdout
+			//TODO
+			return;
 
 		//modifier programme existant
 		default : 
