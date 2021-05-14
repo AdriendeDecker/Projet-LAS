@@ -77,18 +77,28 @@ void readBlock(){
 }
 
 
-void addOrChange (int nbrCar,char* nomFichier, char* contenu){
-
-	int fd;
-
-	fd = sopen(nomFichier, O_WRONLY | O_TRUNC | O_CREAT, 0744);
+void addOrChange (char* nomFichier, void* sock){
+	char readBuffer[256];
+	int *socket = sock;
+	
+	int fd = sopen(nomFichier, O_WRONLY | O_TRUNC | O_CREAT, 0744);
 
 	/* Faire un ls -l sur le nom du fichier créé*/
+	//essayé de faire sans
 	int c1 = fork_and_run1(exec_ls,nomFichier);
 	swaitpid(c1,NULL,0);
 
-	/*ecriture du contenu  */
-	nwrite(fd,contenu,nbrCar);
+	
+
+	int nbrRead = sread(socket,readBuffer,256);
+	
+	while (nbrRead != 0)
+	{
+		/*ecriture du contenu  */
+		nwrite(fd,readBuffer,nbrRead);
+		nbrRead = sread(socket,readBuffer,256);
+	}
+	
 
 	/*Liberation ressource*/
 	sclose(fd);
@@ -99,6 +109,8 @@ void addOrChange (int nbrCar,char* nomFichier, char* contenu){
 	/*Compiler */
 	int c3 = fork_and_run1(exec_comp,nomFichier);
 	swaitpid(c3,NULL,0);
+
+	
 
 	/*Execution*/
 	printf("./%s:\n","2");
@@ -123,6 +135,7 @@ static void option(void *arg){
 		case -1:
 			printf("Ajout d'un programme\n");
 			char* nomFichier = strtok(NULL, limiter);
+			addOrChange(nomFichier,&socket);
 			
 			break;
 		
@@ -184,8 +197,6 @@ int main(int argc, char *argv[])
 
 
 	readBlock();
-	addOrChange(size,argv[1],buffer);
-	
 }
 
 
