@@ -8,4 +8,11 @@ typedef struct SERVERMESSAGE {
     int exitCode;
 } serverMessage;
 
+typedef struct PROGRAM {
+    char name[255];
+    bool compiled;
+    int executedCount;
+    float durationMS;
+} program;
+
 #endif
