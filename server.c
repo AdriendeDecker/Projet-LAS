@@ -15,6 +15,7 @@
 
 
 #include "utils_v10.h"
+#include "serverMessage.h"
 
 #define BACKLOG 50
 #define SERVER_PORT 2500
@@ -32,7 +33,7 @@ typedef struct PROGRAM {
     char name[255];
     bool compiled;
     int executedCount;
-    int durationMS;
+    float durationMS;
 } program;
 
 
@@ -110,7 +111,7 @@ void addOrChange (char* nomFichier, void* sock){
 	int c3 = fork_and_run1(exec_comp,nomFichier);
 	swaitpid(c3,NULL,0);
 
-	
+
 
 	/*Execution*/
 	printf("./%s:\n","2");
@@ -143,31 +144,80 @@ static void option(void *arg){
 		case -2:
 			printf("-2\n");
 			shm_id_prog = sshmget(SHMKEY_PROGRAMMES, sizeof(program[1000]), 0);
-        	shm_id_index = sshmget(SHMKEY_INDEX, sizeof(int), 0);
+			shm_id_index = sshmget(SHMKEY_INDEX, sizeof(int), 0);
+			sem_id = sem_get(SEMKEY,1);
 
 			program* programs;
-			int* programIndex;
-
 			programs = sshmat(shm_id_prog);
-			programIndex = sshmat(shm_id_index);
+			int *indexProg = sshmat(shm_id_index);
 
 			char* nextarg = strtok(NULL, limiter);
 			int idProg = atoi(nextarg);
+			
+			//verif prog exist
+			if(idProg>=*indexProg){
+				serverMessage servermsg;
+				servermsg.idProg = idProg;
+				servermsg.state = -2;
+				servermsg.duration = 0;
+				servermsg.exitCode = -1;
+				swrite(*socket, &servermsg, sizeof(servermsg));
+				return;
+			}
+			
+			//verif prog has compiled
+			if(!programs[idProg].compiled){
+				serverMessage servermsg;
+				servermsg.idProg = idProg;
+				servermsg.state = -1;
+				servermsg.duration = 0;
+				servermsg.exitCode = -1;
+				swrite(*socket, &servermsg, sizeof(servermsg));
+				return;
+			}
+			
 			char* path = "./";
-			strcat(&path, nextarg);
+			strcat(path, nextarg);
+
 
 			struct timeval start, stop;
 			gettimeofday(&start, NULL);
-			sexecl(path,NULL);
+
+			int exitCode = sexecl(path,NULL);
 			gettimeofday(&stop, NULL);
 
 			float duree = ((stop.tv_sec - start.tv_sec) *1000.0f) + ((stop.tv_usec - start.tv_usec) / 1000.0f);
 
 			sem_down0(sem_id);
-			programs[idProg].executedCount = programs[idProg].executedCount++;
+			programs[idProg].executedCount = (programs[idProg].executedCount)+1;
+			programs[idProg].durationMS = (programs[idProg].durationMS) + duree;
 			sem_up0(sem_id);
+
+			//error during execution
+			if(exitCode == -1){
+				serverMessage servermsg;
+				servermsg.idProg = idProg;
+				servermsg.state = 0;
+				servermsg.duration = 0;
+				servermsg.exitCode = exitCode;
+				swrite(*socket, &servermsg, sizeof(servermsg));
+				//send stdout
+				//TODO
+				return;
+			}
+
+			printf("duree prog = %f", duree);
 			
-			break;
+			//normal exit
+			serverMessage servermsg;
+			servermsg.idProg = idProg;
+			servermsg.state = 1;
+			servermsg.duration = duree;
+			servermsg.exitCode = 0;
+			swrite(*socket, &servermsg, sizeof(servermsg));
+			//send stdout
+			//TODO
+			return;
 
 		//modifier programme existant
 		default : 
