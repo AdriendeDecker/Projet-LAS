@@ -14,7 +14,7 @@ typedef struct PROGRAM {
     char name[255];
     bool compiled;
     int executedCount;
-    int durationMS;
+    float durationMS;
 } program;
 
 int main(int argc, char const *argv[]) {
@@ -45,7 +45,7 @@ int main(int argc, char const *argv[]) {
         printf("false\n");
     }
     printf("%d\n",programs[id].executedCount);
-    printf("%d\n",programs[id].durationMS);
+    printf("%f\n",programs[id].durationMS);
 
     sshmdt(programs);
 
