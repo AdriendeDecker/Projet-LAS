@@ -11,7 +11,7 @@ typedef struct SERVERMESSAGE {
 typedef struct {
     int num;
     int pathLength;
-    char name[256];
+    char name[255];
 } clientMessage;
 
 #endif

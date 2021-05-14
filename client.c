@@ -9,7 +9,8 @@
 #include "utils_v10.h"
 #include "serverMessage.h"
 
-#define COMMAND_SIZE 255
+#define MAX_CMD_SIZE 255
+#define BUFFER_SIZE 1000
 #define MAX_PROGRAMMES 100
 
 int initSocket(char* adr, int port);
@@ -60,7 +61,7 @@ void execProcess(void *arg1, void *arg2, void *arg3) {
 int main(int argc, char** argv) {
 
     int pipefd[2];
-    char bufferCmd[COMMAND_SIZE];
+    char bufferCmd[MAX_CMD_SIZE];
     char* save[3];
     bool validCmd = false;
     bool stop = false;
@@ -128,12 +129,21 @@ void replace(char* adr, int port, int num, char* path) {
     int filefd = sopen(path, O_RDONLY, 0700);
     int pathlength = strlen(path);
 
-    clientMessage msg;
+    clientMessage msg;                                                          //p4 point 2.a
     msg.num = num;
     msg.pathLength = pathlength;
     strcpy(msg.name, path);
+    
+    swrite(sockfd, &msg, sizeof(clientMessage));                                //écrit ce qui est stocké dans msg dans sockfd
 
-    swrite(sockfd, &msg, sizeof(clientMessage));
+    char buffer[BUFFER_SIZE];                                                   //va copier ce qui se trouve dans le fichier et le copier dans le socket
+    int nbCharRd = sread(filefd, buffer, BUFFER_SIZE);
+    while(nbCharRd != 0) {
+        swrite(sockfd, buffer, BUFFER_SIZE);
+        nbCharRd = sread(filefd, buffer, BUFFER_SIZE);
+    }
+
+    shutdown(sockfd, SHUT_RDWR);                                                //ferme la connexion en read et write
 }
 
 //exécution d'un seul programme
@@ -150,7 +160,7 @@ int initSocket(char* adr, int port) {
 
 //utilisée pour séparer les différentes données de la ligne rentrée par le client
 void applyStrtoken (char* buffer, char** save) {
-    sread(0, buffer, COMMAND_SIZE);
+    sread(0, buffer, MAX_CMD_SIZE);
     char* separator = " ";
     char* strToken = strtok(buffer, separator);
     int i = 0;
