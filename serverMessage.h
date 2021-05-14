@@ -8,4 +8,10 @@ typedef struct SERVERMESSAGE {
     int exitCode;
 } serverMessage;
 
+typedef struct {
+    int num;
+    int pathLength;
+    char name[256];
+} clientMessage;
+
 #endif

@@ -2,17 +2,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include "utils_v10.h"
+#include "serverMessage.h"
 
 #define COMMAND_SIZE 255
 #define MAX_PROGRAMMES 100
 
+int initSocket(char* adr, int port);
 void applyStrtoken (char* buffer, char** save);
 void add(char* adr, int port, char* path);
 void replace(char* adr, int port, int num, char* path);
 void execute1(char* adr, int port, int num);
 
-
+//child minuteur
 void minuteurProcess(void *arg1, void *arg2) {
     int *delay = arg1;
     int *pipefd = arg2;
@@ -30,6 +36,7 @@ void minuteurProcess(void *arg1, void *arg2) {
     sclose(pipefd[1]);
 }
 
+//child d'exécution récurrente
 void execProcess(void *arg1, void *arg2, void *arg3) {
     int *port = arg1;
     char *adr = arg2;
@@ -109,18 +116,39 @@ int main(int argc, char** argv) {
     exit(0);
 }
 
+
+//ajout d'un programme
 void add(char* adr, int port, char* path) {
-
+    replace(adr, port, -1, path);
 }
 
+//remplacement d'un programme
 void replace(char* adr, int port, int num, char* path) {
+    int sockfd = initSocket(adr, port);
+    int filefd = sopen(path, O_RDONLY, 0700);
+    int pathlength = strlen(path);
 
+    clientMessage msg;
+    msg.num = num;
+    msg.pathLength = pathlength;
+    strcpy(msg.name, path);
+
+    swrite(sockfd, &msg, sizeof(clientMessage));
 }
 
+//exécution d'un seul programme
 void execute1(char* adr, int port, int num) {
 
 }
 
+//initialise le socket
+int initSocket(char* adr, int port) {
+    int sockfd = ssocket();
+    sconnect(adr, port, sockfd);
+    return sockfd;
+}
+
+//utilisée pour séparer les différentes données de la ligne rentrée par le client
 void applyStrtoken (char* buffer, char** save) {
     sread(0, buffer, COMMAND_SIZE);
     char* separator = " ";
