@@ -15,7 +15,7 @@ struct program {
     char name[255];
     bool compiled;
     int executedCount;
-    int durationMS;
+    float durationMS;
 };
 
 int main(int argc, char const **argv){
