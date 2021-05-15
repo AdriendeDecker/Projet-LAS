@@ -142,7 +142,6 @@ void addProgram (char* nomFichier, void* sock){
 	while (nbrRead != 0){
 		nwrite(fd,readBuffer,nbrRead);
 		nbrRead = sread(*socket,readBuffer, sizeof(readBuffer));
-		printf("sclose");
 	}
 	sclose(fd);
 
@@ -155,12 +154,9 @@ void addProgram (char* nomFichier, void* sock){
 	program *programs = sshmat(shm_id_prog);
 	int *indexProg = sshmat(shm_id_index);
 
-	printf("compilation debut add");
 	/*Compiler */
 	int c3 = fork_and_run1(exec_comp,indexProg);
 	swaitpid(c3,NULL,0);
-
-	printf("compilation ok");
 
 	sem_down0(sem_id);
 	*programs[*indexProg].name = *nomFichier;
@@ -171,8 +167,8 @@ void addProgram (char* nomFichier, void* sock){
 	if(codeExec == 0){
 		/*Execution*/
 		printf("./%d:\n",*indexProg);
-		char prognum[5];
-		sprintf(prognum,"./%d",*indexProg);
+		char prognum[15];
+		sprintf(prognum, "./code/%d", *indexProg);
 		sexecl(prognum,NULL);
 	}
 
@@ -188,7 +184,7 @@ void addProgram (char* nomFichier, void* sock){
 	sshmdt(indexProg);
 	sshmdt(programs);
 	remove("./code/newProg.c");
-	codeExec =0;
+	codeExec = 0;
 }
 
 void executeProg(void* sock){
@@ -280,7 +276,7 @@ static void exec_comp (void* indexProg){
 	int *index = indexProg;
 	char fileName[15];
 	sprintf(fileName, "./code/%d", *index);
-	sexecl("/usr/bin/gcc","gcc","-o",fileName,"./code/newProg.c",NULL);
+	codeExec =sexecl("/usr/bin/gcc","gcc","-o",fileName,"./code/newProg.c",NULL);
 	printf("fin exec comp");
 }
 
