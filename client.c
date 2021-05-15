@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
         char* path;
         int num;
         while(!validCmd){
-            if(save[0] == "+") {
+            if(strcmp(save[0], "+") == 0) {
                 path = save[1];
                 add(adr, port, path);
                 validCmd = true;
@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
 //ajout d'un programme
 void add(char* adr, int port, char* path) {
     int sockfd = initSocket(adr, port);
-    int filefd = sopen(path, O_RDONLY, 0700);
+    int filefd = sopen(path, O_RDONLY , 0400);
     int pathlength = strlen(path);
 
     clientMessage msg;
@@ -145,11 +145,12 @@ void add(char* adr, int port, char* path) {
 
     swrite(sockfd, &msg, sizeof(clientMessage));
 
+    printf("%s\n", path);
     char buffer[BUFFER_SIZE];
-    int nbCharRd = sread(filefd, buffer, BUFFER_SIZE);
+    int nbCharRd = sread(filefd, buffer, sizeof(buffer));
     while(nbCharRd != 0) {
-        swrite(sockfd, buffer, BUFFER_SIZE);
-        nbCharRd = sread(filefd, buffer, BUFFER_SIZE);
+        swrite(sockfd, buffer, nbCharRd);
+        nbCharRd = sread(filefd, buffer, sizeof(buffer));
     }
     shutdown(sockfd, SHUT_WR);
 
@@ -219,7 +220,7 @@ int initSocket(char* adr, int port) {
 //utilisée pour séparer les différentes données de la ligne rentrée par le client
 void applyStrtoken (char* buffer, char** save) {
     sread(0, buffer, MAX_CMD_SIZE);
-    char* separator = " ";
+    char* separator = " \n";
     char* strToken = strtok(buffer, separator);
     int i = 0;
     while (strToken != NULL) {
