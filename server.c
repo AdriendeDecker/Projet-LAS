@@ -13,7 +13,6 @@
 #include <fcntl.h>
 #include <ctype.h>
 
-
 #include "utils_v10.h"
 #include "server.h"
 #include "typeDefStruct.h"
@@ -47,10 +46,6 @@ int main(int argc, char *argv[]) {
 	readBlock();
 }
 
-// PRE:  ServerPort: a valid port number
-// POST: on success bind a socket to 0.0.0.0:port and listen to it
-//       return socket file descriptor
-//       on failure, displays error cause and quits the program
 int initSocketServer(int port){
 	int sockfd = ssocket();
 
@@ -63,6 +58,40 @@ int initSocketServer(int port){
 
 	return sockfd;
 } 
+
+/*Choix de l'option*/
+static void option(void *arg){
+	int *socket = arg;
+	char input[BUFFER];
+	sread (*socket,&input,sizeof(input));
+	
+	char* token;
+	//token = premier arg recu
+	token = strtok(input, limiter);
+	int operation = atoi(token);
+
+	switch(operation){
+		//ajouter nouveau programme
+		case -1:
+			printf("add program\n");
+			char* nomFichier = strtok(NULL, limiter);
+			addProgram(nomFichier,&socket);
+			break;
+		
+		//exécuter programme existant
+		case -2:
+			printf("execute program\n");
+			executeProg(&socket);
+			break;
+
+		//modifier programme existant
+		default : 
+			printf("modify program\n");
+			char* nomFile = strtok(NULL, limiter);
+			modifyProgram(nomFile, &socket,&operation);
+			break;
+	}
+}
 
 void modifyProgram(char* nomFichier, void* sock, void* numProg){
 	char readBuffer[BUFFER];
@@ -100,6 +129,12 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg){
 
 	sshmdt(programs);
 	remove(nomFichier);
+
+	char retour[25];
+	sprintf(retour, "%d %d", *numProgram, execComp);
+	swrite(*socket, retour, sizeof(retour));
+	//rajouter msg compilateur si pas réussi a compiler
+
 	codeExec = 0;
 }
 
@@ -152,6 +187,12 @@ void addProgram (char* nomFichier, void* sock){
 	sshmdt(indexProg);
 	sshmdt(programs);
 	remove(nomFichier);
+
+	char retour[25];
+	sprintf(retour, "%d %d", *indexProg, c3);
+	swrite(*socket, retour, sizeof(retour));
+	//rajouter msg compilateur si pas réussi a compiler
+
 	codeExec =0;
 }
 
@@ -232,41 +273,6 @@ void executeProg(void* sock){
 	//TODO
 	return;
 }
-
-/*Choix de l'option*/
-static void option(void *arg){
-	int *socket = arg;
-	char input[BUFFER];
-	sread (*socket,&input,sizeof(input));
-	
-	char* token;
-	//token = premier arg recu
-	token = strtok(input, limiter);
-	int operation = atoi(token);
-
-	switch(operation){
-		//ajouter nouveau programme
-		case -1:
-			printf("add program\n");
-			char* nomFichier = strtok(NULL, limiter);
-			addProgram(nomFichier,&socket);
-			break;
-		
-		//exécuter programme existant
-		case -2:
-			printf("execute program\n");
-			executeProg(&socket);
-			break;
-
-		//modifier programme existant
-		default : 
-			printf("modify program\n");
-			char* nomFile = strtok(NULL, limiter);
-			modifyProgram(nomFile, &socket,&operation);
-			break;
-	}
-}
-
 
 static void exec_cat(void *arg){
 	char *scriptname = arg;
