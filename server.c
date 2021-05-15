@@ -20,7 +20,7 @@
 
 #define BACKLOG 50
 #define SERVER_PORT 2500
-#define BUFFER 255
+#define BUFFER 256
 #define MAX_CONNECTION 50
 #define SHMKEY_PROGRAMMES 123
 #define SHMKEY_INDEX 456
@@ -33,7 +33,7 @@ static volatile int codeExec = 0;
 const char limiter[1]= " ";
 
 int main(int argc, char *argv[]) {
- 
+	//port server doit venir de argv => ex: ./server 9090
 	int sockfd = initSocketServer(SERVER_PORT);
 	printf("server %i \n",SERVER_PORT);
 
@@ -64,53 +64,56 @@ int initSocketServer(int port){
 	return sockfd;
 } 
 
-static void exec_ls(void *arg){
-	char *scriptName = arg;
-	printf("-ls -l %s:\n", scriptName);
-	sexecl("/bin/ls","ls","-ls",scriptName,NULL);
-}
+void modifyProgram(char* nomFichier, void* sock, void* numProg){
+	char readBuffer[BUFFER];
+	int* socket = sock;
+	int* numProgram = numProg;
 
-static void exec_cat(void *arg){
-	char *scriptname = arg;
-	printf("cat %s : \n",scriptname);
-	sexecl("/bin/cat","cat",scriptname,NULL);
-}
+	int fd = sopen(nomFichier, O_WRONLY | O_TRUNC | O_CREAT, 0744);
 
-static void exec_comp (void *arg,void* indexProg){
-	char *scriptName = arg;
-	int *index = indexProg;
-	codeExec = sexecl("/usr/bin/gcc","gcc","-o",index,scriptName,NULL);
-}
+	int nbrRead = sread(*socket, readBuffer, BUFFER);
+	while(nbrRead != 0){
+		swrite(fd, readBuffer, nbrRead);
+		nbrRead = sread(*socket,readBuffer,BUFFER);
+	}
+	sclose(fd);
 
-void readBlock(){
-	size = sread(0,buffer,BUFFER);	
-}
+	int c2 = fork_and_run1(exec_cat,nomFichier);
+	swaitpid(c2,NULL,0);
 
+	/*Acces memoire partagée*/
+	int sem_id, shm_id_prog;
+	shm_id_prog = sshmget(SHMKEY_PROGRAMMES, sizeof(program[1000]), 0);
+	sem_id = sem_get(SEMKEY,1);
+
+	program *programs = sshmat(shm_id_prog);
+
+	int execComp = fork_and_run2(exec_comp,nomFichier,numProgram);
+	swaitpid(execComp,NULL,0);
+
+	sem_down0(sem_id);
+	*programs[*numProgram].name = *nomFichier;
+	programs[*numProgram].compiled = (codeExec!=-1);
+	programs[*numProgram].executedCount = 0;
+	programs[*numProgram].durationMS = 0;
+	sem_up0(sem_id);
+
+	sshmdt(programs);
+	remove(nomFichier);
+	codeExec = 0;
+}
 
 void addProgram (char* nomFichier, void* sock){
-	char readBuffer[256];
+	char readBuffer[BUFFER];
 	int *socket = sock;
 	
 	int fd = sopen(nomFichier, O_WRONLY | O_TRUNC | O_CREAT, 0744);
 
-	/* Faire un ls -l sur le nom du fichier créé*/
-	//essayé de faire sans
-	int c1 = fork_and_run1(exec_ls,nomFichier);
-	swaitpid(c1,NULL,0);
-
-	
-
-	int nbrRead = sread(*socket,readBuffer,256);
-	
-	while (nbrRead != 0)
-	{
-		/*ecriture du contenu  */
+	int nbrRead = sread(*socket,readBuffer, BUFFER);
+	while (nbrRead != 0){
 		nwrite(fd,readBuffer,nbrRead);
-		nbrRead = sread(*socket,readBuffer,256);
+		nbrRead = sread(*socket,readBuffer,BUFFER);
 	}
-	
-
-	/*Liberation ressource*/
 	sclose(fd);
 
 	int c2 = fork_and_run1(exec_cat,nomFichier);
@@ -125,16 +128,15 @@ void addProgram (char* nomFichier, void* sock){
 	program *programs = sshmat(shm_id_prog);
 	int *indexProg = sshmat(shm_id_index);
 
-	sem_down0(sem_id);
-
 	/*Compiler */
 	int c3 = fork_and_run2(exec_comp,nomFichier,indexProg);
 	swaitpid(c3,NULL,0);
 
-	
+	sem_down0(sem_id);
 	*programs[*indexProg].name = *nomFichier;
 	programs[*indexProg].compiled = (codeExec!=-1);
-
+	programs[*indexProg].durationMS = 0;
+	programs[*indexProg].executedCount = 0;
 
 	if(codeExec == 0){
 		/*Execution*/
@@ -146,8 +148,10 @@ void addProgram (char* nomFichier, void* sock){
 
 	*indexProg = (*indexProg +1);
 	sem_up0(sem_id);
+
 	sshmdt(indexProg);
 	sshmdt(programs);
+	remove(nomFichier);
 	codeExec =0;
 }
 
@@ -186,14 +190,12 @@ void executeProg(void* sock){
 		swrite(*socket, &servermsg, sizeof(servermsg));
 		return;
 	}
-	
 	char* path = "./";
 	strcat(path, nextarg);
 
-
 	struct timeval start, stop;
-	gettimeofday(&start, NULL);
 
+	gettimeofday(&start, NULL);
 	int exitCode = sexecl(path,NULL);
 	gettimeofday(&stop, NULL);
 
@@ -242,29 +244,42 @@ static void option(void *arg){
 	token = strtok(input, limiter);
 	int operation = atoi(token);
 
-
 	switch(operation){
 		//ajouter nouveau programme
 		case -1:
-			printf("Ajout d'un programme\n");
+			printf("add program\n");
 			char* nomFichier = strtok(NULL, limiter);
 			addProgram(nomFichier,&socket);
 			break;
 		
 		//exécuter programme existant
 		case -2:
-			printf("Exécution d'un programme\n");
+			printf("execute program\n");
 			executeProg(&socket);
 			break;
 
 		//modifier programme existant
 		default : 
-			printf("num programme\n");
+			printf("modify program\n");
+			char* nomFile = strtok(NULL, limiter);
+			modifyProgram(nomFile, &socket,&operation);
 			break;
 	}
-
 }
 
 
+static void exec_cat(void *arg){
+	char *scriptname = arg;
+	printf("cat %s : \n",scriptname);
+	sexecl("/bin/cat","cat",scriptname,NULL);
+}
 
+static void exec_comp (void *arg,void* indexProg){
+	char *scriptName = arg;
+	int *index = indexProg;
+	codeExec = sexecl("/usr/bin/gcc","gcc","-o",index,scriptName,NULL);
+}
 
+void readBlock(){
+	size = sread(0,buffer,BUFFER);	
+}
