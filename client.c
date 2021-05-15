@@ -12,6 +12,8 @@
 #define MAX_CMD_SIZE 255
 #define MAX_PROGRAMMES 100
 
+volatile sig_atomic_t end_recurr = 0;
+
 int initSocket(char* adr, int port);
 void applyStrtoken (char* buffer, char** save);
 void add(char* adr, int port, char* path);
@@ -27,13 +29,18 @@ void minuteurProcess(void *arg1, void *arg2) {
     //pipe écriture
     sclose(pipefd[0]);
 
-    //condition à trouver (via un quit ou autre par exemple)
-    while(1) {
+    
+    while(end_recurr == 0) {                                                         //tant que le signal de stop n'est pas envoyé
         sleep(*delay);
         swrite(pipefd[1],&battement, sizeof(int));
     }
 
     sclose(pipefd[1]);
+}
+
+//signal handler pour stopper le minuteur
+void stop_timer_handler() {
+    end_recurr = 1;
 }
 
 //child d'exécution récurrente
@@ -48,10 +55,17 @@ void execProcess(void *arg1, void *arg2, void *arg3) {
     //pipe lecture
     sclose(pipefd[1]);
 
-    int nbInt = read(pipefd[0], &numProgramme, sizeof(int));
+    int nbInt = sread(pipefd[0], &numProgramme, sizeof(int));                       //lit le pipe et stocke les nums des programmes (si c'est -1, c'est un battement)
     while(nbInt > 0) {
-        tabProgrammes[nbrProgrammes] = numProgramme;
-        nbrProgrammes++;
+        if(numProgramme > 0) {                                                      //si on lit un programme
+            tabProgrammes[nbrProgrammes] = numProgramme;                            //ajoute le programme à la liste
+            nbrProgrammes++;
+        }else {                                                                     //si c'est un battement de coeur
+            for(int i=0; i<nbrProgrammes; i++) {
+                execute1(adr, *port, tabProgrammes[i]);                             //exécute chaque programme du tableau
+            }
+        }
+        nbInt = sread(pipefd[0], &numProgramme, sizeof(int));
     }
 
     sclose(pipefd[0]);
@@ -69,6 +83,7 @@ int main(int argc, char** argv) {
     int delay = atoi(argv[3]);
     char* adr = argv[1];
 
+    ssigaction(SIGUSR1, stop_timer_handler);
     spipe(pipefd);
     int childExec = fork_and_run3(execProcess, &port, &adr, pipefd);
     int childMinuteur = fork_and_run2(minuteurProcess, &delay, pipefd);
@@ -96,9 +111,10 @@ int main(int argc, char** argv) {
                 validCmd = true;
             } else if(save[0] == "*") {
                 num = atoi(save[1]);
-                //voir avec fils
+                swrite(pipefd[1], &num, sizeof(int));                       //permet de récupérer les nums dans le child d'exec
                 validCmd = true;
             } else if(save[0] == "q") {
+                validCmd = true;
                 stop = true;
                 //free la liste des programmes (via un signal pour le minuteur et via la fermeture du pipe pour les programmes récurrents)
             } else {
@@ -107,6 +123,8 @@ int main(int argc, char** argv) {
             }
         }
     }
+
+    skill(childMinuteur, SIGUSR1);
 
     sclose(pipefd[1]);
 
