@@ -18,7 +18,7 @@
 #include "typeDefStruct.h"
 
 #define BACKLOG 50
-#define SERVER_PORT 2500
+#define SERVER_PORT 6003
 #define BUFFER 256
 #define MAX_CONNECTION 50
 #define SHMKEY_PROGRAMMES 123
@@ -53,9 +53,6 @@ int initSocketServer(int port){
 
 	slisten(sockfd, BACKLOG);
 
-	//int option = 1;
-	// setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(int));
-
 	return sockfd;
 } 
 
@@ -64,8 +61,6 @@ static void option(void *arg){
 	int *socket = arg;
 	clientMessage clientmsg;
 	sread (*socket,&clientmsg,sizeof(clientmsg));
-    printf("%s\n", clientmsg.name);
-	printf("%d\n", clientmsg.num);
 
 	switch(clientmsg.num){
 		//ajouter nouveau programme
@@ -77,7 +72,7 @@ static void option(void *arg){
 		//exécuter programme existant
 		case -2:
 			printf("execute program\n");
-			executeProg(&socket);
+			executeProg(&socket, clientmsg.pathLength);
 			break;
 
 		//modifier programme existant
@@ -159,27 +154,26 @@ void addProgram (char* nomFichier, void* sock){
 	swaitpid(c3,NULL,0);
 
 	sem_down0(sem_id);
-	*programs[*indexProg].name = *nomFichier;
+	strcpy(programs[*indexProg].name, nomFichier);
 	programs[*indexProg].compiled = (codeExec!=-1);
 	programs[*indexProg].durationMS = 0;
 	programs[*indexProg].executedCount = 0;
-
-	if(codeExec == 0){
-		/*Execution*/
-		printf("./%d:\n",*indexProg);
-		char prognum[15];
-		sprintf(prognum, "./code/%d", *indexProg);
-		sexecl(prognum,NULL);
-	}
-
+	int fileIndex = *indexProg;
 	*indexProg = (*indexProg +1);
 	sem_up0(sem_id);
+	printf("la sémaphore a été libérée\n");
 
-
-	char retour[25];
-	sprintf(retour, "%d %d", *indexProg, c3);
-	swrite(*socket, retour, sizeof(retour));
-	//rajouter msg compilateur si pas réussi a compiler
+	serverResponse serverRes;
+	serverRes.num = fileIndex;
+	printf("%d\n", fileIndex);
+	if(codeExec != -1){ //program compiled success
+		serverRes.compile = 0;
+	} else { // not compiled
+		serverRes.compile = -1;
+		//TODO
+		strcpy(serverRes.errorMessage, "mon message d'erreur TODO");
+	}
+	swrite(*socket, &serverRes, sizeof(serverRes));
 
 	sshmdt(indexProg);
 	sshmdt(programs);
@@ -187,44 +181,33 @@ void addProgram (char* nomFichier, void* sock){
 	codeExec = 0;
 }
 
-void executeProg(void* sock){
+void executeProg(void* sock, int numProg){
 	int *socket = sock;
-	int sem_id, shm_id_prog, shm_id_index;
+	int sem_id, shm_id_prog;
 	shm_id_prog = sshmget(SHMKEY_PROGRAMMES, sizeof(program[1000]), 0);
-	shm_id_index = sshmget(SHMKEY_INDEX, sizeof(int), 0);
 	sem_id = sem_get(SEMKEY,1);
 
 	program* programs;
+	printf("avant verif 1 ?");
 	programs = sshmat(shm_id_prog);
-	int *indexProg = sshmat(shm_id_index);
-
-	char* nextarg = strtok(NULL, limiter);
-	int idProg = atoi(nextarg);
-	
-	//verif prog exist
-	if(idProg>=*indexProg){
-		serverMessage servermsg;
-		servermsg.idProg = idProg;
-		servermsg.state = -2;
-		servermsg.duration = 0;
-		servermsg.exitCode = -1;
-		swrite(*socket, &servermsg, sizeof(servermsg));
-		return;
-	}
+	printf("avant verif 2 ?");
 	
 	//verif prog has compiled
-	if(!programs[idProg].compiled){
+	if(!programs[numProg].compiled){
 		serverMessage servermsg;
-		servermsg.idProg = idProg;
+		servermsg.idProg = numProg;
 		servermsg.state = -1;
 		servermsg.duration = 0;
 		servermsg.exitCode = -1;
 		swrite(*socket, &servermsg, sizeof(servermsg));
 		return;
 	}
-	char* path = "./";
-	strcat(path, nextarg);
 
+	char path[15] = "./code/";
+	char num[4];
+	sprintf(num, "%d",numProg);
+	strcat(path, num);
+	
 	struct timeval start, stop;
 
 	gettimeofday(&start, NULL);
@@ -234,14 +217,16 @@ void executeProg(void* sock){
 	float duree = ((stop.tv_sec - start.tv_sec) *1000.0f) + ((stop.tv_usec - start.tv_usec) / 1000.0f);
 
 	sem_down0(sem_id);
-	programs[idProg].executedCount = (programs[idProg].executedCount)+1;
-	programs[idProg].durationMS = (programs[idProg].durationMS) + duree;
+	programs[numProg].executedCount = (programs[numProg].executedCount)+1;
+	programs[numProg].durationMS = (programs[numProg].durationMS) + duree;
 	sem_up0(sem_id);
+
+	printf("on arrive ici ?");
 
 	//error during execution
 	if(exitCode == -1){
 		serverMessage servermsg;
-		servermsg.idProg = idProg;
+		servermsg.idProg = numProg;
 		servermsg.state = 0;
 		servermsg.duration = 0;
 		servermsg.exitCode = exitCode;
@@ -255,7 +240,7 @@ void executeProg(void* sock){
 	
 	//normal exit
 	serverMessage servermsg;
-	servermsg.idProg = idProg;
+	servermsg.idProg = numProg;
 	servermsg.state = 1;
 	servermsg.duration = duree;
 	servermsg.exitCode = 0;

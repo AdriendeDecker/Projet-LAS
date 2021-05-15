@@ -100,20 +100,20 @@ int main(int argc, char** argv) {
                 path = save[1];
                 add(adr, port, path);
                 validCmd = true;
-            } else if(save[0] == ".") {
+            } else if(strcmp(save[0], ".") == 0) {
                 num = atoi(save[1]);
                 path = save[2];
                 replace(adr, port, num, path);
                 validCmd = true;
-            } else if(save[0] == "@") {
+            } else if(strcmp(save[0], "@") == 0) {
                 num = atoi(save[1]);
                 execute1(adr, port, num);
                 validCmd = true;
-            } else if(save[0] == "*") {
+            } else if(strcmp(save[0], "*") == 0) {
                 num = atoi(save[1]);
                 swrite(pipefd[1], &num, sizeof(int));                       //permet de récupérer les nums dans le child d'exec
                 validCmd = true;
-            } else if(save[0] == "q") {
+            } else if(strcmp(save[0], "q") == 0) {
                 validCmd = true;
                 stop = true;
                 //free la liste des programmes (via un signal pour le minuteur et via la fermeture du pipe pour les programmes récurrents)
@@ -122,6 +122,7 @@ int main(int argc, char** argv) {
                 applyStrtoken(bufferCmd, save);
             }
         }
+        validCmd = false;
     }
 
     skill(childMinuteur, SIGUSR1);
@@ -194,8 +195,8 @@ void execute1(char* adr, int port, int num) {
     int sockfd = initSocket(adr, port);
 
     clientMessage msg;
-    msg.num = num;
-    msg.pathLength = -2;                            //demandé de return -2 et pas de pathLength
+    msg.num = -2;                                   //demandé de return -2
+    msg.pathLength = num;                           //num du program a executer
     strcpy(msg.name, "");                           //rien demandé ici
 
     swrite(sockfd, &msg, sizeof(clientMessage));
@@ -206,9 +207,6 @@ void execute1(char* adr, int port, int num) {
         response.idProg, response.state, response.duration, response.exitCode);
     sclose(sockfd);
 }
-
-
-
 
 //initialise le socket
 int initSocket(char* adr, int port) {

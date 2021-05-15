@@ -5,7 +5,7 @@ int main(int argc, char *argv[]);
 
 static void option(void *arg);
 
-void executeProg(void *arg);
+void executeProg(void *arg, int numProg);
 
 void addProgram(char* nomFichier, void* sock);
 
