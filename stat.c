@@ -5,17 +5,12 @@
 #include <stdbool.h>
 
 #include "utils_v10.h"
+#include "typeDefStruct.h"
 
 #define SHMKEY_PROGRAMMES 123
 #define SHMKEY_INDEX 456
 #define SEMKEY 789
 
-typedef struct PROGRAM {
-    char name[255];
-    bool compiled;
-    int executedCount;
-    float durationMS;
-} program;
 
 int main(int argc, char const *argv[]) {
     if(argc < 2){
