@@ -106,9 +106,6 @@ int main(int argc, char** argv) {
                 applyStrtoken(bufferCmd, save);
             }
         }
-        for(int i = 0; i<3; i++) {
-            free(save[i]);
-        }
     }
 
     sclose(pipefd[1]);
@@ -119,7 +116,30 @@ int main(int argc, char** argv) {
 
 //ajout d'un programme
 void add(char* adr, int port, char* path) {
-    replace(adr, port, -1, path);
+    int sockfd = initSocket(adr, port);
+    int filefd = sopen(path, O_RDONLY, 0700);
+    int pathlength = strlen(path);
+
+    clientMessage msg;
+    msg.num = -1;
+    msg.pathLength = pathlength;
+    strcpy(msg.name, path);
+
+    swrite(sockfd, &msg, sizeof(clientMessage));
+
+    char buffer[BUFFER_SIZE];
+    int nbCharRd = sread(filefd, buffer, BUFFER_SIZE);
+    while(nbCharRd != 0) {
+        swrite(sockfd, buffer, BUFFER_SIZE);
+        nbCharRd = sread(filefd, buffer, BUFFER_SIZE);
+    }
+    shutdown(sockfd, SHUT_WR);
+
+    serverResponse response;
+    sread(sockfd, &response, sizeof(serverResponse));
+    printf("Programme num %d ajouté \nCode de compilation : %d \nMessage d'erreur : %s \n", 
+        response.num, response.compile, response.errorMessage);
+    sclose(sockfd);
 }
 
 //remplacement d'un programme
@@ -141,18 +161,35 @@ void replace(char* adr, int port, int num, char* path) {
         swrite(sockfd, buffer, BUFFER_SIZE);
         nbCharRd = sread(filefd, buffer, BUFFER_SIZE);
     }
-    shutdown(sockfd, SHUT_RDWR);                                                //bloque la connexion en read et write (close la supprime)
+    shutdown(sockfd, SHUT_WR);                                                //bloque la connexion en write (close la supprime)
 
     serverResponse response;
     sread(sockfd, &response, sizeof(serverResponse));                           //récupère les infos dans le socket et les mets dans response
-    printf("Programme num %d \nMessage d'erreur : %s \n", response.num, response.errorMessage);
+    printf("Programme num %d remplacé \nCode de compilation : %d \nMessage d'erreur : %s \n", 
+        response.num, response.compile, response.errorMessage);
     sclose(sockfd);
 }
 
 //exécution d'un seul programme
 void execute1(char* adr, int port, int num) {
+    int sockfd = initSocket(adr, port);
 
+    clientMessage msg;
+    msg.num = num;
+    msg.pathLength = -2;                            //demandé de return -2 et pas de pathLength
+    strcpy(msg.name, "");                           //rien demandé ici
+
+    swrite(sockfd, &msg, sizeof(clientMessage));
+
+    serverMessage response;
+    sread(sockfd, &response, sizeof(serverMessage));                //read les données récupérées du serveur et les stocke dans la response
+    printf("Programme num %d exécuté \nEtat du programme : %d \nTemps d'exécution : %f \nCode de retour : %d \n", 
+        response.idProg, response.state, response.duration, response.exitCode);
+    sclose(sockfd);
 }
+
+
+
 
 //initialise le socket
 int initSocket(char* adr, int port) {

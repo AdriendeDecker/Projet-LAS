@@ -3,7 +3,7 @@
 
 typedef struct SERVERMESSAGE {
     int idProg;
-    int state;
+    int state;                      //-2, -1, 0 ou 1
     float duration;
     int exitCode;
 } serverMessage;
@@ -16,11 +16,8 @@ typedef struct CLIENTMESSAGE{
 
 typedef struct SERVERRESPONSE {
     int num;
-    int compile;                    //(pour add ou replace) 0 si ça compile, autre si pas
-    char errorMessage[255];         //(pour add ou replace) msg d'erreur du compilateur
-    int state;                      //(pour exec) -2, -1, 0 ou 1
-    int executionTime;              //(pour exec)
-    int exitCode;                   //(pour exec)
+    int compile;                    //0 si ça compile, autre si pas
+    char errorMessage[255];         //msg d'erreur du compilateur
 } serverResponse;
 
 typedef struct PROGRAM {
