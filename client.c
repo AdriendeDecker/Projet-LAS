@@ -7,7 +7,7 @@
 #include <fcntl.h>
 
 #include "utils_v10.h"
-#include "serverMessage.h"
+#include "typeDefStruct.h"
 
 #define MAX_CMD_SIZE 255
 #define BUFFER_SIZE 1000
@@ -136,7 +136,7 @@ void replace(char* adr, int port, int num, char* path) {
     
     swrite(sockfd, &msg, sizeof(clientMessage));                                //écrit ce qui est stocké dans msg dans sockfd
 
-    char buffer[BUFFER_SIZE];                                                   //va copier ce qui se trouve dans le fichier et le copier dans le socket
+    char buffer[BUFFER_SIZE];                                                   //va copier ce qui se trouve dans le fichier et le mettre dans le socket
     int nbCharRd = sread(filefd, buffer, BUFFER_SIZE);
     while(nbCharRd != 0) {
         swrite(sockfd, buffer, BUFFER_SIZE);

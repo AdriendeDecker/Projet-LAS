@@ -8,10 +8,17 @@ typedef struct SERVERMESSAGE {
     int exitCode;
 } serverMessage;
 
-typedef struct {
+typedef struct CLIENTMESSAGE{
     int num;
     int pathLength;
     char name[255];
 } clientMessage;
+
+typedef struct PROGRAM {
+    char name[255];
+    bool compiled;
+    int executedCount;
+    float durationMS;
+} program;
 
 #endif
