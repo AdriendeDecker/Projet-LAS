@@ -168,16 +168,17 @@ void addProgram (char* nomFichier, void* sock){
 	sclose(pipe[1]);
 	swaitpid(c3,NULL,0);
 
-	char outputCompiler[255];
+	char outputCompiler[1024];
 	serverResponse serverRes;
 	nbrRead = 0;
 	bool compiled = true;
-	printf("nbrRead = %d\n",nbrRead);
+
+	serverRes.errorMessage = (char*) malloc(sizeof(char));
 	while((nbrRead = sread(pipe[0], outputCompiler, sizeof(outputCompiler))) != 0){
-		compiled = false;
+		serverRes.errorMessage =  realloc(serverRes.errorMessage, nbrRead*sizeof(char));
 		strcpy(serverRes.errorMessage, outputCompiler);
+		compiled = false;
 	}
-	printf("nbrRead 3 = %d\n",nbrRead);
 	
 	sem_down0(sem_id);
 	strcpy(programs[*indexProg].name, nomFichier);
@@ -192,10 +193,12 @@ void addProgram (char* nomFichier, void* sock){
 	serverRes.num = fileIndex;
 	if(compiled){
 		serverRes.compile = 0;
+		strcpy(serverRes.errorMessage, "Pas d'erreur");
 	} else{
 		serverRes.compile = -1;
 	}
 	swrite(*socket, &serverRes, sizeof(serverRes));
+	swrite(*socket, serverRes.errorMessage, sizeof(serverRes.errorMessage));
 
 	sshmdt(indexProg);
 	sshmdt(programs);
@@ -252,7 +255,7 @@ void executeProg(void* sock, int numProg){
 	servermsg.exitCode = 0;
 
 	int nbrRead;
-	char output[255];
+	char output[1024];
 	while((nbrRead = sread(pipeExec[0], output, sizeof(output))) != 0){
 		strcpy(servermsg.message, output);
 	}

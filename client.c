@@ -156,9 +156,20 @@ void add(char* adr, int port, char* path) {
     shutdown(sockfd, SHUT_WR);
 
     serverResponse response;
-    sread(sockfd, &response, sizeof(serverResponse));
-    printf("Programme num %d ajouté \nCode de compilation : %d \nMessage d'erreur : %s \n", 
-        response.num, response.compile, response.errorMessage);
+    sread(sockfd, &response, sizeof(response));
+    response.errorMessage = (char*) malloc(sizeof(char));
+    printf("Programme num %d ajouté \nCode de compilation : %d \n", 
+        response.num, response.compile);
+    if(response.compile == -1){
+        printf("n'importe quoi");
+        int nbrRead = sread(sockfd, &buffer, sizeof(buffer));
+        while(nbrRead != 0){
+            response.errorMessage = realloc(response.errorMessage, nbrRead*sizeof(char));
+            strcpy(response.errorMessage, buffer);
+            nbrRead = sread(sockfd, &buffer, sizeof(buffer));
+        }
+        printf("Message d'erreur : %s", response.errorMessage);
+    }
     sclose(sockfd);
 }
 
