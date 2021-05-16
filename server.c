@@ -18,21 +18,19 @@
 #include "typeDefStruct.h"
 
 #define BACKLOG 50
-#define SERVER_PORT 6003
 #define BUFFER 256
 #define MAX_CONNECTION 50
 #define SHMKEY_PROGRAMMES 123
 #define SHMKEY_INDEX 456
 #define SEMKEY 789
+#define NEW_FILE_NAME "./code/newProg.c"
 
 int idx = -1;
 int size = -1;
 char buffer[BUFFER];
-static volatile int codeExec = 0;
 const char limiter[1]= " ";
 
 int main(int argc, char *argv[]) {
-	//port server doit venir de argv => ex: ./server 9090
 	if(argc < 2 ){
 		printf("Il manque le numéro du port \n");
 		exit(0);
@@ -92,8 +90,10 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg){
 	int* socket = sock;
 	int* numProgram = numProg;
 
-	int fd = sopen("./code/newProg.c", O_WRONLY | O_TRUNC | O_CREAT, 0644);
+	//create new file for new program
+	int fd = sopen(NEW_FILE_NAME, O_WRONLY | O_TRUNC | O_CREAT, 0644);
 
+	//copy program read on socket in new file
 	int nbrRead = sread(*socket,readBuffer, sizeof(readBuffer));
 	while (nbrRead != 0){
 		nwrite(fd,readBuffer,nbrRead);
@@ -110,6 +110,7 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg){
 	int pipe[2];
 	spipe(pipe);
 	
+	//exec compilation
 	int execComp = fork_and_run2(exec_comp,numProgram, &pipe);
 	sclose(pipe[1]);
 	swaitpid(execComp,NULL,0);
@@ -119,11 +120,13 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg){
 	nbrRead = 0;
 	bool compiled = true;
 
+	//only if compilation error and pipe[0] is not empty
 	while((nbrRead = sread(pipe[0], outputCompiler, sizeof(outputCompiler))) != 0){
 		strcpy(serverRes.errorMessage, outputCompiler);
 		compiled = false;
 	}
 
+	//update program info in shared memory
 	sem_down0(sem_id);
 	strcpy(programs[*numProgram].name,nomFichier);
 	programs[*numProgram].compiled = compiled;
@@ -131,8 +134,9 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg){
 	programs[*numProgram].durationMS = 0;
 	sem_up0(sem_id);
 
+	//detatch shared memory + remove source code file
 	sshmdt(programs);
-	remove("./code/newProg.c");
+	remove(NEW_FILE_NAME);
 
 	serverRes.num = *numProgram;
 	if(compiled){ //program compiled success
@@ -140,18 +144,17 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg){
 		strcpy(serverRes.errorMessage, "");
 	} else { // not compiled
 		serverRes.compile = -1;
+		//serverRes.errorMessage has already the info needed
 	}
 	swrite(*socket, &serverRes, sizeof(serverRes));
-	//rajouter msg compilateur si pas réussi a compiler
-
-	codeExec = 0;
 }
 
 void addProgram (char* nomFichier, void* sock){
 	char readBuffer[BUFFER];
 	int *socket = sock;
 
-	int fd = sopen("./code/newProg.c", O_WRONLY | O_TRUNC | O_CREAT, 0644);
+	//create new file for new program
+	int fd = sopen(NEW_FILE_NAME, O_WRONLY | O_TRUNC | O_CREAT, 0644);
 	int nbrRead = sread(*socket,readBuffer, sizeof(readBuffer));
 	while (nbrRead != 0){
 		nwrite(fd,readBuffer,nbrRead);
@@ -180,11 +183,13 @@ void addProgram (char* nomFichier, void* sock){
 	nbrRead = 0;
 	bool compiled = true;
 
+	//only if error while compiling
 	while((nbrRead = sread(pipe[0], outputCompiler, sizeof(outputCompiler))) != 0){
 		strcpy(serverRes.errorMessage, outputCompiler);
 		compiled = false;
 	}
 	
+	//adding new program to shared memory + update logic length
 	sem_down0(sem_id);
 	strcpy(programs[*indexProg].name, nomFichier);
 	programs[*indexProg].compiled = compiled;
@@ -194,6 +199,7 @@ void addProgram (char* nomFichier, void* sock){
 	*indexProg = (*indexProg +1);
 	sem_up0(sem_id);
 
+	//Prepare reponse data
 	serverRes.num = fileIndex;
 	if(compiled){
 		serverRes.compile = 0;
@@ -202,23 +208,26 @@ void addProgram (char* nomFichier, void* sock){
 	}
 	swrite(*socket, &serverRes, sizeof(serverRes));
 
+	//detatch shared memory + remove source file
 	sshmdt(indexProg);
 	sshmdt(programs);
-	remove("./code/newProg.c");
-	codeExec = 0;
+	remove(NEW_FILE_NAME);
 }
 
 void executeProg(void* sock, int numProg){
 	int *socket = sock;
 	int sem_id, shm_id_prog;
+
+	//get shared memory + semaphore
 	shm_id_prog = sshmget(SHMKEY_PROGRAMMES, sizeof(program[1000]), 0);
 	sem_id = sem_get(SEMKEY,1);
 
 	program* programs;
 	programs = sshmat(shm_id_prog);
 	
-	//verif prog has compiled
+	//verify if program has compiled
 	if(!programs[numProg].compiled){
+		//prepared return data + exit
 		serverMessage servermsg;
 		servermsg.idProg = numProg;
 		servermsg.state = -1;
@@ -236,6 +245,7 @@ void executeProg(void* sock, int numProg){
 
 	spipe(pipeExec);
 
+	//fork to execute the program
 	gettimeofday(&start, NULL);
 	int childId = fork_and_run2(exec_exec, path,(void*)&pipeExec);
 	sclose(pipeExec[1]);
@@ -244,12 +254,13 @@ void executeProg(void* sock, int numProg){
 
 	float duree = ((stop.tv_sec - start.tv_sec) *1000.0f) + ((stop.tv_usec - start.tv_usec) / 1000.0f);
 
+	//update program info in shared memory
 	sem_down0(sem_id);
 	programs[numProg].executedCount = (programs[numProg].executedCount)+1;
 	programs[numProg].durationMS = (programs[numProg].durationMS) + duree;
 	sem_up0(sem_id);
 	
-	//normal exit
+	//prepare return data
 	serverMessage servermsg;
 	servermsg.idProg = numProg;
 	servermsg.state = 1;
@@ -258,9 +269,12 @@ void executeProg(void* sock, int numProg){
 
 	int nbrRead;
 	char output[1024];
+	//read stdout of the executed program
 	while((nbrRead = sread(pipeExec[0], output, sizeof(output))) != 0){
 		strcpy(servermsg.message, output);
 	}
+
+	//send data to client
 	swrite(*socket, &servermsg, sizeof(serverMessage));
 	return;
 }
@@ -268,13 +282,16 @@ void executeProg(void* sock, int numProg){
 static void exec_comp (void* indexProg, void *pipe){
 	int *index = indexProg;
 	int *pipeComp = pipe;
+
+	//redirect stderr to pipe[1]
 	dup2(pipeComp[1], 2);
 	sclose(pipeComp[0]);
 	sclose(pipeComp[1]);
 
 	char fileName[15];
 	sprintf(fileName, "./code/%d", *index);
-	sexecl("/usr/bin/gcc","gcc","-o",fileName,"./code/newProg.c",NULL);
+	//compile program
+	sexecl("/usr/bin/gcc","gcc","-o",fileName,NEW_FILE_NAME,NULL);
 	exit(errno);
 }
 
@@ -282,10 +299,12 @@ static void exec_exec(void* path,void *pipe){
 	char *newPath = path;
 	int *pipeExec = pipe;
 
+	//redirect stdout to pipe[1]
 	dup2(pipeExec[1],1);
 	sclose(pipeExec[0]);
 	sclose(pipeExec[1]);
 
+	//execute program
 	int ret = sexecl(newPath, newPath, NULL);
 	exit(ret);
 }
