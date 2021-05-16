@@ -18,19 +18,16 @@ int main(int argc, char const *argv[]) {
         return 0;
     }
     
-    int sem_id, shm_id_prog, shm_id_index;
+    int sem_id, shm_id_prog;
     
+    //Get Shared Memory + Semaphore
     sem_id = sem_get(SEMKEY, 1);
     shm_id_prog = sshmget(SHMKEY_PROGRAMMES, sizeof(program[1000]), 0);
-    shm_id_index = sshmget(SHMKEY_INDEX, sizeof(int), 0);
 
     program* programs;
-    int* programsIndex;
-
     programs = sshmat(shm_id_prog);
-    programsIndex = sshmat(shm_id_index);
 
-    
+    //print out info about program
     int id = atoi(argv[1]);
     printf("%d\n", id);
     printf("%s\n", programs[id].name);
