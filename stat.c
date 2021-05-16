@@ -31,8 +31,8 @@ int main(int argc, char const *argv[]) {
     programsIndex = sshmat(shm_id_index);
 
     
-    int id = atoi(argv[1])-1;
-    printf("%d\n", id+1);
+    int id = atoi(argv[1]);
+    printf("%d\n", id);
     printf("%s\n", programs[id].name);
     if(programs[id].compiled){
         printf("true\n");
