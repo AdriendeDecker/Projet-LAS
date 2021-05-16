@@ -37,10 +37,12 @@ int main(int argc, char const **argv){
     } 
     else if(strcmp(argv[1], "2") == 0) {
         printf("action 2 : destruction des ressources partagées\n");
-
+        //Get Shared Memory + Semaphore
         sem_id = sem_create(SEMKEY, 1, PERM, 1);
         shm_id_prog = sshmget(SHMKEY_PROGRAMMES, sizeof(program[1000]), 0);
         shm_id_index = sshmget(SHMKEY_INDEX, sizeof(int), 0);
+
+        //Delete Shared Memory + Semaphore
         sshmdelete(shm_id_prog);
         sshmdelete(shm_id_index);
         sem_delete(sem_id);
