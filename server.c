@@ -189,7 +189,6 @@ void addProgram (char* nomFichier, void* sock){
 	*indexProg = (*indexProg +1);
 	sem_up0(sem_id);
 
-	
 	serverRes.num = fileIndex;
 	if(compiled){
 		serverRes.compile = 0;
