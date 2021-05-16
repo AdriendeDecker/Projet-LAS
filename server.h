@@ -19,4 +19,6 @@ static void exec_cat(void *arg);
 
 int initSocketServer(int port);
 
+static void exec_exec(void* path);
+
 #endif

@@ -57,7 +57,7 @@ void execProcess(void *arg1, void *arg2, void *arg3) {
 
     int nbInt = sread(pipefd[0], &numProgramme, sizeof(int));                       //lit le pipe et stocke les nums des programmes (si c'est -1, c'est un battement)
     while(nbInt > 0) {
-        if(numProgramme > 0) {                                                      //si on lit un programme
+        if(numProgramme >= 0) {                                                      //si on lit un programme
             tabProgrammes[nbrProgrammes] = numProgramme;                            //ajoute le programme à la liste
             nbrProgrammes++;
         }else {                                                                     //si c'est un battement de coeur
@@ -176,10 +176,10 @@ void replace(char* adr, int port, int num, char* path) {
     swrite(sockfd, &msg, sizeof(clientMessage));                                //écrit ce qui est stocké dans msg dans sockfd
 
     char buffer[BUFFER_SIZE];                                                   //va copier ce qui se trouve dans le fichier et le mettre dans le socket
-    int nbCharRd = sread(filefd, buffer, BUFFER_SIZE);
+    int nbCharRd = sread(filefd, buffer, sizeof(buffer));
     while(nbCharRd != 0) {
-        swrite(sockfd, buffer, BUFFER_SIZE);
-        nbCharRd = sread(filefd, buffer, BUFFER_SIZE);
+        swrite(sockfd, buffer, sizeof(buffer));
+        nbCharRd = sread(filefd, buffer, sizeof(buffer));
     }
     shutdown(sockfd, SHUT_WR);                                                //bloque la connexion en write (close la supprime)
 

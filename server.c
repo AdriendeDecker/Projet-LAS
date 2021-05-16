@@ -33,8 +33,13 @@ const char limiter[1]= " ";
 
 int main(int argc, char *argv[]) {
 	//port server doit venir de argv => ex: ./server 9090
-	int sockfd = initSocketServer(SERVER_PORT);
-	printf("server %i \n",SERVER_PORT);
+	if(argc < 2 ){
+		printf("Il manque le numéro du port \n");
+		exit(0);
+	}
+	int server_port = atoi(argv[1]);
+	int sockfd = initSocketServer(server_port);
+	printf("server %i \n",server_port);
 
 	while (true)
 	{
@@ -43,7 +48,6 @@ int main(int argc, char *argv[]) {
 
 		fork_and_run1(option,&newsockfd);
 	}
-	readBlock();
 }
 
 int initSocketServer(int port){
@@ -72,13 +76,13 @@ static void option(void *arg){
 		//exécuter programme existant
 		case -2:
 			printf("execute program\n");
-			executeProg(&socket, clientmsg.pathLength);
+			executeProg(socket, clientmsg.pathLength);
 			break;
 
 		//modifier programme existant
 		default : 
 			printf("modify program\n");
-			modifyProgram(clientmsg.name, &socket,&clientmsg.num);
+			modifyProgram(clientmsg.name, socket,&clientmsg.num);
 			break;
 	}
 }
@@ -152,7 +156,6 @@ void addProgram (char* nomFichier, void* sock){
 	/*Compiler */
 	int c3 = fork_and_run1(exec_comp,indexProg);
 	swaitpid(c3,NULL,0);
-
 	sem_down0(sem_id);
 	strcpy(programs[*indexProg].name, nomFichier);
 	programs[*indexProg].compiled = (codeExec!=-1);
@@ -161,11 +164,9 @@ void addProgram (char* nomFichier, void* sock){
 	int fileIndex = *indexProg;
 	*indexProg = (*indexProg +1);
 	sem_up0(sem_id);
-	printf("la sémaphore a été libérée\n");
 
 	serverResponse serverRes;
 	serverRes.num = fileIndex;
-	printf("%d\n", fileIndex);
 	if(codeExec != -1){ //program compiled success
 		serverRes.compile = 0;
 	} else { // not compiled
@@ -188,9 +189,7 @@ void executeProg(void* sock, int numProg){
 	sem_id = sem_get(SEMKEY,1);
 
 	program* programs;
-	printf("avant verif 1 ?");
 	programs = sshmat(shm_id_prog);
-	printf("avant verif 2 ?");
 	
 	//verif prog has compiled
 	if(!programs[numProg].compiled){
@@ -202,16 +201,14 @@ void executeProg(void* sock, int numProg){
 		swrite(*socket, &servermsg, sizeof(servermsg));
 		return;
 	}
-
-	char path[15] = "./code/";
-	char num[4];
-	sprintf(num, "%d",numProg);
-	strcat(path, num);
 	
+	char path[15];
+	sprintf(path, "./code/%d",numProg);
 	struct timeval start, stop;
 
 	gettimeofday(&start, NULL);
-	int exitCode = sexecl(path,NULL);
+	int childId = fork_and_run1(exec_exec, path);
+	swaitpid(childId, NULL, 0);
 	gettimeofday(&stop, NULL);
 
 	float duree = ((stop.tv_sec - start.tv_sec) *1000.0f) + ((stop.tv_usec - start.tv_usec) / 1000.0f);
@@ -220,23 +217,6 @@ void executeProg(void* sock, int numProg){
 	programs[numProg].executedCount = (programs[numProg].executedCount)+1;
 	programs[numProg].durationMS = (programs[numProg].durationMS) + duree;
 	sem_up0(sem_id);
-
-	printf("on arrive ici ?");
-
-	//error during execution
-	if(exitCode == -1){
-		serverMessage servermsg;
-		servermsg.idProg = numProg;
-		servermsg.state = 0;
-		servermsg.duration = 0;
-		servermsg.exitCode = exitCode;
-		swrite(*socket, &servermsg, sizeof(servermsg));
-		//send stdout
-		//TODO
-		return;
-	}
-
-	printf("duree prog = %f", duree);
 	
 	//normal exit
 	serverMessage servermsg;
@@ -244,7 +224,7 @@ void executeProg(void* sock, int numProg){
 	servermsg.state = 1;
 	servermsg.duration = duree;
 	servermsg.exitCode = 0;
-	swrite(*socket, &servermsg, sizeof(servermsg));
+	swrite(*socket, &servermsg, sizeof(serverMessage));
 	//send stdout
 	//TODO
 	return;
@@ -252,19 +232,17 @@ void executeProg(void* sock, int numProg){
 
 static void exec_cat(void *arg){
 	char *scriptname = arg;
-	printf("cat %s : \n",scriptname);
 	sexecl("/bin/cat","cat",scriptname,NULL);
 }
 
 static void exec_comp (void* indexProg){
-	printf("debut exec comp");
 	int *index = indexProg;
 	char fileName[15];
 	sprintf(fileName, "./code/%d", *index);
 	codeExec =sexecl("/usr/bin/gcc","gcc","-o",fileName,"./code/newProg.c",NULL);
-	printf("fin exec comp");
 }
 
-void readBlock(){
-	size = sread(0,buffer,BUFFER);	
+static void exec_exec(void* path){
+	char *newPath = path;
+	sexecl(newPath, newPath, NULL);
 }
