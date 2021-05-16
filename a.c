@@ -2,6 +2,6 @@
 
 int main(int argc, char const *argv[])
 {
-    printf("modified program");
+    printf("modified program\n");
     return 0;
 }

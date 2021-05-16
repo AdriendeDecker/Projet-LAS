@@ -107,8 +107,11 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg){
 	sem_id = sem_get(SEMKEY,1);
 
 	program *programs = sshmat(shm_id_prog);
-
-	int execComp = fork_and_run1(exec_comp,numProgram);
+	int pipe[2];
+	spipe(pipe);
+	
+	int execComp = fork_and_run2(exec_comp,numProgram, &pipe);
+	sclose(pipe[1]);
 	swaitpid(execComp,NULL,0);
 
 	sem_down0(sem_id);
@@ -125,7 +128,7 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg){
 	serverRes.num = *numProgram;
 	if(codeExec != -1){ //program compiled success
 		serverRes.compile = 0;
-		strcpy(serverRes.errorMessage, "");
+		strcpy(serverRes.errorMessage, "Le programme a compilé avec succès");
 	} else { // not compiled
 		serverRes.compile = -1;
 		//TODO
@@ -159,25 +162,34 @@ void addProgram (char* nomFichier, void* sock){
 	int *indexProg = sshmat(shm_id_index);
 
 	/*Compiler */
-	int c3 = fork_and_run1(exec_comp,indexProg);
+	int pipe[2];
+	spipe(pipe);
+	printf("codeExec avant exec = %d\n",codeExec);
+	int c3 = fork_and_run2(exec_comp,indexProg, &pipe);
+	sclose(pipe[1]);
 	swaitpid(c3,NULL,0);
+	printf("codeExec apres exec = %d\n",codeExec);
+
+	char outputCompiler[255];
+	serverResponse serverRes;
+	while((nbrRead = sread(pipe[0], outputCompiler, sizeof(outputCompiler))) != 0){
+		strcpy(serverRes.errorMessage, outputCompiler);
+	}
 	sem_down0(sem_id);
 	strcpy(programs[*indexProg].name, nomFichier);
-	programs[*indexProg].compiled = (codeExec!=-1);
+	programs[*indexProg].compiled = (codeExec != -1);
 	programs[*indexProg].durationMS = 0;
 	programs[*indexProg].executedCount = 0;
 	int fileIndex = *indexProg;
 	*indexProg = (*indexProg +1);
 	sem_up0(sem_id);
 
-	serverResponse serverRes;
+	
 	serverRes.num = fileIndex;
 	if(codeExec != -1){ //program compiled success
 		serverRes.compile = 0;
 	} else { // not compiled
 		serverRes.compile = -1;
-		//TODO
-		strcpy(serverRes.errorMessage, "mon message d'erreur TODO");
 	}
 	swrite(*socket, &serverRes, sizeof(serverRes));
 
@@ -203,6 +215,7 @@ void executeProg(void* sock, int numProg){
 		servermsg.state = -1;
 		servermsg.duration = 0;
 		servermsg.exitCode = -1;
+		strcpy(servermsg.message, "Le programme n'a pas d'exécutable car pas réussi a compilé");
 		swrite(*socket, &servermsg, sizeof(servermsg));
 		return;
 	}
@@ -216,6 +229,7 @@ void executeProg(void* sock, int numProg){
 
 	gettimeofday(&start, NULL);
 	int childId = fork_and_run2(exec_exec, path,(void*)&pipeExec);
+	sclose(pipeExec[1]);
 	swaitpid(childId, NULL, 0);
 	gettimeofday(&stop, NULL);
 
@@ -235,23 +249,26 @@ void executeProg(void* sock, int numProg){
 
 	int nbrRead;
 	char output[255];
-	printf("je plante \n");
-	while ((nbrRead = sread(pipeExec[0],output,sizeof(output)))!=0)
-	{
-		strcat(servermsg.message,output);
+	while((nbrRead = sread(pipeExec[0], output, sizeof(output))) != 0){
+		strcpy(servermsg.message, output);
 	}
-	
 	swrite(*socket, &servermsg, sizeof(serverMessage));
-	//send stdout
-	//TODO
 	return;
 }
 
-static void exec_comp (void* indexProg){
+static void exec_comp (void* indexProg, void *pipe){
 	int *index = indexProg;
+	int *pipeComp = pipe;
+	dup2(pipeComp[1], 2);
+	sclose(pipeComp[0]);
+	sclose(pipeComp[1]);
+
 	char fileName[15];
 	sprintf(fileName, "./code/%d", *index);
+	
 	codeExec =sexecl("/usr/bin/gcc","gcc","-o",fileName,"./code/newProg.c",NULL);
+	
+	exit(errno);
 }
 
 static void exec_exec(void* path,void *pipe){
@@ -262,5 +279,6 @@ static void exec_exec(void* path,void *pipe){
 	sclose(pipeExec[0]);
 	sclose(pipeExec[1]);
 
-	sexecl(newPath, newPath, NULL);
+	int ret = sexecl(newPath, newPath, NULL);
+	exit(ret);
 }

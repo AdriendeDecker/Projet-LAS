@@ -13,7 +13,7 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg);
 
 void readBlock();
 
-static void exec_comp(void* indexProg);
+static void exec_comp(void* indexProg, void *pipe);
 
 int initSocketServer(int port);
 

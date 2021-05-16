@@ -203,8 +203,8 @@ void execute1(char* adr, int port, int num) {
 
     serverMessage response;
     sread(sockfd, &response, sizeof(serverMessage));                //read les données récupérées du serveur et les stocke dans la response
-    printf("Programme num %d exécuté \nEtat du programme : %d \nTemps d'exécution : %f \nCode de retour : %d \n", 
-        response.idProg, response.state, response.duration, response.exitCode);
+    printf("Programme num %d exécuté \nEtat du programme : %d \nTemps d'exécution : %f \nCode de retour : %d \nOutput : \n%s\n", 
+        response.idProg, response.state, response.duration, response.exitCode, response.message);
     sclose(sockfd);
 }
 
