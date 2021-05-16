@@ -164,20 +164,24 @@ void addProgram (char* nomFichier, void* sock){
 	/*Compiler */
 	int pipe[2];
 	spipe(pipe);
-	printf("codeExec avant exec = %d\n",codeExec);
 	int c3 = fork_and_run2(exec_comp,indexProg, &pipe);
 	sclose(pipe[1]);
 	swaitpid(c3,NULL,0);
-	printf("codeExec apres exec = %d\n",codeExec);
 
 	char outputCompiler[255];
 	serverResponse serverRes;
+	nbrRead = 0;
+	bool compiled = true;
+	printf("nbrRead = %d\n",nbrRead);
 	while((nbrRead = sread(pipe[0], outputCompiler, sizeof(outputCompiler))) != 0){
+		compiled = false;
 		strcpy(serverRes.errorMessage, outputCompiler);
 	}
+	printf("nbrRead 3 = %d\n",nbrRead);
+	
 	sem_down0(sem_id);
 	strcpy(programs[*indexProg].name, nomFichier);
-	programs[*indexProg].compiled = (codeExec != -1);
+	programs[*indexProg].compiled = compiled;
 	programs[*indexProg].durationMS = 0;
 	programs[*indexProg].executedCount = 0;
 	int fileIndex = *indexProg;
@@ -186,9 +190,9 @@ void addProgram (char* nomFichier, void* sock){
 
 	
 	serverRes.num = fileIndex;
-	if(codeExec != -1){ //program compiled success
+	if(compiled){
 		serverRes.compile = 0;
-	} else { // not compiled
+	} else{
 		serverRes.compile = -1;
 	}
 	swrite(*socket, &serverRes, sizeof(serverRes));
@@ -265,9 +269,7 @@ static void exec_comp (void* indexProg, void *pipe){
 
 	char fileName[15];
 	sprintf(fileName, "./code/%d", *index);
-	
-	codeExec =sexecl("/usr/bin/gcc","gcc","-o",fileName,"./code/newProg.c",NULL);
-	
+	sexecl("/usr/bin/gcc","gcc","-o",fileName,"./code/newProg.c",NULL);
 	exit(errno);
 }
 
