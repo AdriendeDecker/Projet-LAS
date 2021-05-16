@@ -18,7 +18,7 @@ typedef struct CLIENTMESSAGE{
 typedef struct SERVERRESPONSE {
     int num;
     int compile;                    //0 si ça compile, autre si pas
-    char *errorMessage;             //msg d'erreur du compilateur
+    char errorMessage[1024];        //msg d'erreur du compilateur
 } serverResponse;
 
 typedef struct PROGRAM {

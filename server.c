@@ -114,9 +114,19 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg){
 	sclose(pipe[1]);
 	swaitpid(execComp,NULL,0);
 
+	char outputCompiler[1024];
+	serverResponse serverRes;
+	nbrRead = 0;
+	bool compiled = true;
+
+	while((nbrRead = sread(pipe[0], outputCompiler, sizeof(outputCompiler))) != 0){
+		strcpy(serverRes.errorMessage, outputCompiler);
+		compiled = false;
+	}
+
 	sem_down0(sem_id);
 	strcpy(programs[*numProgram].name,nomFichier);
-	programs[*numProgram].compiled = (codeExec!=-1);
+	programs[*numProgram].compiled = compiled;
 	programs[*numProgram].executedCount = 0;
 	programs[*numProgram].durationMS = 0;
 	sem_up0(sem_id);
@@ -124,15 +134,12 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg){
 	sshmdt(programs);
 	remove("./code/newProg.c");
 
-	serverResponse serverRes;
 	serverRes.num = *numProgram;
-	if(codeExec != -1){ //program compiled success
+	if(compiled){ //program compiled success
 		serverRes.compile = 0;
-		strcpy(serverRes.errorMessage, "Le programme a compilé avec succès");
+		strcpy(serverRes.errorMessage, "");
 	} else { // not compiled
 		serverRes.compile = -1;
-		//TODO
-		strcpy(serverRes.errorMessage, "mon message d'erreur TODO");
 	}
 	swrite(*socket, &serverRes, sizeof(serverRes));
 	//rajouter msg compilateur si pas réussi a compiler
@@ -173,9 +180,7 @@ void addProgram (char* nomFichier, void* sock){
 	nbrRead = 0;
 	bool compiled = true;
 
-	serverRes.errorMessage = (char*) malloc(sizeof(char));
 	while((nbrRead = sread(pipe[0], outputCompiler, sizeof(outputCompiler))) != 0){
-		serverRes.errorMessage =  realloc(serverRes.errorMessage, nbrRead*sizeof(char));
 		strcpy(serverRes.errorMessage, outputCompiler);
 		compiled = false;
 	}
@@ -192,12 +197,10 @@ void addProgram (char* nomFichier, void* sock){
 	serverRes.num = fileIndex;
 	if(compiled){
 		serverRes.compile = 0;
-		strcpy(serverRes.errorMessage, "Pas d'erreur");
 	} else{
 		serverRes.compile = -1;
 	}
 	swrite(*socket, &serverRes, sizeof(serverRes));
-	swrite(*socket, serverRes.errorMessage, sizeof(serverRes.errorMessage));
 
 	sshmdt(indexProg);
 	sshmdt(programs);
@@ -221,7 +224,7 @@ void executeProg(void* sock, int numProg){
 		servermsg.state = -1;
 		servermsg.duration = 0;
 		servermsg.exitCode = -1;
-		strcpy(servermsg.message, "Le programme n'a pas d'exécutable car pas réussi a compilé");
+		strcpy(servermsg.message, "Le programme n'a pas d'exécutable car il n'a pas réussi a compilé");
 		swrite(*socket, &servermsg, sizeof(servermsg));
 		return;
 	}

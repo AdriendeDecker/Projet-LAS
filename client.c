@@ -146,7 +146,6 @@ void add(char* adr, int port, char* path) {
 
     swrite(sockfd, &msg, sizeof(clientMessage));
 
-    printf("%s\n", path);
     char buffer[BUFFER_SIZE];
     int nbCharRd = sread(filefd, buffer, sizeof(buffer));
     while(nbCharRd != 0) {
@@ -157,18 +156,10 @@ void add(char* adr, int port, char* path) {
 
     serverResponse response;
     sread(sockfd, &response, sizeof(response));
-    response.errorMessage = (char*) malloc(sizeof(char));
     printf("Programme num %d ajouté \nCode de compilation : %d \n", 
         response.num, response.compile);
     if(response.compile == -1){
-        printf("n'importe quoi");
-        int nbrRead = sread(sockfd, &buffer, sizeof(buffer));
-        while(nbrRead != 0){
-            response.errorMessage = realloc(response.errorMessage, nbrRead*sizeof(char));
-            strcpy(response.errorMessage, buffer);
-            nbrRead = sread(sockfd, &buffer, sizeof(buffer));
-        }
-        printf("Message d'erreur : %s", response.errorMessage);
+        printf("Message d'erreur : %s\n", response.errorMessage);
     }
     sclose(sockfd);
 }
@@ -196,8 +187,11 @@ void replace(char* adr, int port, int num, char* path) {
 
     serverResponse response;
     sread(sockfd, &response, sizeof(serverResponse));                           //récupère les infos dans le socket et les mets dans response
-    printf("Programme num %d remplacé \nCode de compilation : %d \nMessage d'erreur : %s \n", 
-        response.num, response.compile, response.errorMessage);
+    printf("Programme num %d remplacé \nCode de compilation : %d \n", 
+        response.num, response.compile);
+    if(response.compile == -1){
+        printf("Message d'erreur : %s \n", response.errorMessage);
+    }
     sclose(sockfd);
 }
 
