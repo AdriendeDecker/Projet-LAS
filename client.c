@@ -178,7 +178,7 @@ void replace(char* adr, int port, int num, char* path) {
     char buffer[BUFFER_SIZE];                                                   //va copier ce qui se trouve dans le fichier et le mettre dans le socket
     int nbCharRd = sread(filefd, buffer, sizeof(buffer));
     while(nbCharRd != 0) {
-        swrite(sockfd, buffer, sizeof(buffer));
+        swrite(sockfd, buffer, nbCharRd);
         nbCharRd = sread(filefd, buffer, sizeof(buffer));
     }
     shutdown(sockfd, SHUT_WR);                                                //bloque la connexion en write (close la supprime)

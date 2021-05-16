@@ -15,8 +15,6 @@ void readBlock();
 
 static void exec_comp(void* indexProg);
 
-static void exec_cat(void *arg);
-
 int initSocketServer(int port);
 
 static void exec_exec(void* path);

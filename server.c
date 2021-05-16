@@ -92,17 +92,14 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg){
 	int* socket = sock;
 	int* numProgram = numProg;
 
-	int fd = sopen(nomFichier, O_WRONLY | O_TRUNC | O_CREAT, 0744);
+	int fd = sopen("./code/newProg.c", O_WRONLY | O_TRUNC | O_CREAT, 0644);
 
-	int nbrRead = sread(*socket, readBuffer, BUFFER);
-	while(nbrRead != 0){
-		swrite(fd, readBuffer, nbrRead);
-		nbrRead = sread(*socket,readBuffer,BUFFER);
+	int nbrRead = sread(*socket,readBuffer, sizeof(readBuffer));
+	while (nbrRead != 0){
+		nwrite(fd,readBuffer,nbrRead);
+		nbrRead = sread(*socket,readBuffer, sizeof(readBuffer));
 	}
 	sclose(fd);
-
-	int c2 = fork_and_run1(exec_cat,nomFichier);
-	swaitpid(c2,NULL,0);
 
 	/*Acces memoire partagée*/
 	int sem_id, shm_id_prog;
@@ -115,18 +112,26 @@ void modifyProgram(char* nomFichier, void* sock, void* numProg){
 	swaitpid(execComp,NULL,0);
 
 	sem_down0(sem_id);
-	*programs[*numProgram].name = *nomFichier;
+	strcpy(programs[*numProgram].name,nomFichier);
 	programs[*numProgram].compiled = (codeExec!=-1);
 	programs[*numProgram].executedCount = 0;
 	programs[*numProgram].durationMS = 0;
 	sem_up0(sem_id);
 
 	sshmdt(programs);
-	remove(nomFichier);
+	remove("./code/newProg.c");
 
-	char retour[25];
-	sprintf(retour, "%d %d", *numProgram, execComp);
-	swrite(*socket, retour, sizeof(retour));
+	serverResponse serverRes;
+	serverRes.num = *numProgram;
+	if(codeExec != -1){ //program compiled success
+		serverRes.compile = 0;
+		strcpy(serverRes.errorMessage, "");
+	} else { // not compiled
+		serverRes.compile = -1;
+		//TODO
+		strcpy(serverRes.errorMessage, "mon message d'erreur TODO");
+	}
+	swrite(*socket, &serverRes, sizeof(serverRes));
 	//rajouter msg compilateur si pas réussi a compiler
 
 	codeExec = 0;
@@ -228,11 +233,6 @@ void executeProg(void* sock, int numProg){
 	//send stdout
 	//TODO
 	return;
-}
-
-static void exec_cat(void *arg){
-	char *scriptname = arg;
-	sexecl("/bin/cat","cat",scriptname,NULL);
 }
 
 static void exec_comp (void* indexProg){
