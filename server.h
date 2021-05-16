@@ -17,6 +17,6 @@ static void exec_comp(void* indexProg);
 
 int initSocketServer(int port);
 
-static void exec_exec(void* path);
+static void exec_exec(void* path,void *pipe);
 
 #endif

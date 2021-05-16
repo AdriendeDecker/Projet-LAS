@@ -210,9 +210,12 @@ void executeProg(void* sock, int numProg){
 	char path[15];
 	sprintf(path, "./code/%d",numProg);
 	struct timeval start, stop;
+	int pipeExec[2];
+
+	spipe(pipeExec);
 
 	gettimeofday(&start, NULL);
-	int childId = fork_and_run1(exec_exec, path);
+	int childId = fork_and_run2(exec_exec, path,(void*)&pipeExec);
 	swaitpid(childId, NULL, 0);
 	gettimeofday(&stop, NULL);
 
@@ -229,6 +232,15 @@ void executeProg(void* sock, int numProg){
 	servermsg.state = 1;
 	servermsg.duration = duree;
 	servermsg.exitCode = 0;
+
+	int nbrRead;
+	char output[255];
+	printf("je plante \n");
+	while ((nbrRead = sread(pipeExec[0],output,sizeof(output)))!=0)
+	{
+		strcat(servermsg.message,output);
+	}
+	
 	swrite(*socket, &servermsg, sizeof(serverMessage));
 	//send stdout
 	//TODO
@@ -242,7 +254,13 @@ static void exec_comp (void* indexProg){
 	codeExec =sexecl("/usr/bin/gcc","gcc","-o",fileName,"./code/newProg.c",NULL);
 }
 
-static void exec_exec(void* path){
+static void exec_exec(void* path,void *pipe){
 	char *newPath = path;
+	int *pipeExec = pipe;
+
+	dup2(pipeExec[1],1);
+	sclose(pipeExec[0]);
+	sclose(pipeExec[1]);
+
 	sexecl(newPath, newPath, NULL);
 }

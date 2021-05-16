@@ -6,6 +6,7 @@ typedef struct SERVERMESSAGE {
     int state;                      //-2, -1, 0 ou 1
     float duration;
     int exitCode;
+    char message[255];
 } serverMessage;
 
 typedef struct CLIENTMESSAGE{
